@@ -71,3 +71,4 @@
 ## Team Members
 
 - Ksaveri Petrov
+- Nikita Vassiljev
