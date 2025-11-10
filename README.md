@@ -15,7 +15,7 @@
 
 ### Low-fidelity wireframes (hover to see alt text)
 
-![Landing page] (https://github.com/rakenduste-programmeerimine-2025/digitaalne-tootmise-juhtimislahendus-ehitus/blob/main/LFW/Landing%20page.png)
+![Landing page](https://raw.githubusercontent.com/rakenduste-programmeerimine-2025/digitaalne-tootmise-juhtimislahendus-ehitus/refs/heads/main/LFW/Landing%20page.png)
 
 ## Features
 
