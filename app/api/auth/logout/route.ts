@@ -4,7 +4,7 @@ import { sessions } from "@/lib/memoryDb";
 export async function POST(req: NextRequest) {
   try {
     const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("No session");
+    if (!sid) throw new Error("[oAuth] No session");
 
     const index = sessions.findIndex((s) => s.sid === sid);
     if (index !== -1) sessions.splice(index, 1);

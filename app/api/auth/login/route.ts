@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { users, sessions } from "@/lib/memoryDb";
+import jsonwebtoken from "jsonwebtoken";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,6 +15,8 @@ export async function POST(req: NextRequest) {
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     sessions.push({ sid, userId: user.id, expires });
 
+    //tbd: add jwt token that stores user session. 
+
     const response = NextResponse.json(
       {
         message: "[oAuth] User logged in successfully.",
@@ -21,7 +24,7 @@ export async function POST(req: NextRequest) {
           email: user.email,
           first_name: user.first_name,
           last_name: user.last_name,
-        }, // hash?
+        },
       },
       { status: 200 }
     );
