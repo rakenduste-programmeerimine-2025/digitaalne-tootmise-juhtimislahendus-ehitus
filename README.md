@@ -13,6 +13,10 @@
 - express.js
 - supabase
 
+### Low-fidelity wireframes (hover to see alt text)
+
+![Landing page] (https://github.com/rakenduste-programmeerimine-2025/digitaalne-tootmise-juhtimislahendus-ehitus/blob/main/LFW/Landing%20page.png)
+
 ## Features
 
 ### User management
