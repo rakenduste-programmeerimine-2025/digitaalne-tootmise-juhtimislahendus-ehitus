@@ -14,4 +14,19 @@ export const users = [
     is_active: true,
   },
 ];
+
+export const organizations = [
+  {
+    id: "org1",
+    name: "Test Organization",
+    ownerId: "1",
+  },
+];
+
+export const usersInOrganizations: { userId: string; organizationId: string }[] = [
+  {
+    userId: "1",
+    organizationId: "org1",
+  },
+];
 export const sessions: Session[] = [];
