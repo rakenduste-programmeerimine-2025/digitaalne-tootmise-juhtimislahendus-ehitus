@@ -29,4 +29,13 @@ export const usersInOrganizations: { userId: string; organizationId: string }[] 
     organizationId: "org1",
   },
 ];
+
+export const projects = [
+  {
+    id: "proj1",
+    name: "Test Project",
+    organizationId: "org1",
+  },
+]
+
 export const sessions: Session[] = [];
