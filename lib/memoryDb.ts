@@ -41,6 +41,13 @@ export const projects = [
   },
 ];
 
+export const project_details = [
+  {
+    id: "detail1",
+    projectId: "proj1",
+  },
+]
+
 export const sessions: Session[] = [];
 
 export const scopes = [
