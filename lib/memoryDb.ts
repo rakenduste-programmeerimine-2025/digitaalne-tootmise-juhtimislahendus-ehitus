@@ -48,7 +48,13 @@ export const project_details = [
   },
 ]
 
-export const sessions: Session[] = [];
+export const sessions: Session[] = [
+  {
+    sid: "session1",
+    userId: "1",
+    expires: new Date("2026-01-03T00:00:00Z"),
+  }
+];
 
 export const scopes = [
   { id: 1, scope: "scope1" },
