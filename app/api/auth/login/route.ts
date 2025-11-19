@@ -5,13 +5,27 @@ import jsonwebtoken from "jsonwebtoken";
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password } = await req.json();
+    let body: any;
+    try {
+      body = await req.json();
+    } catch (parseErr) {
+      const errorMessage = "Invalid JSON body";
+      return NextResponse.json({ error: errorMessage }, { status: 400 });
+    }
+
+    const { email, password } = body ?? {};
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: "Missing email or password" },
+        { status: 400 }
+      );
+    }
     const user = users.find(
       (u) => u.email === email && u.password === password && u.is_active
     );
     if (!user) throw new Error("Invalid credentials");
 
-    const sid = crypto.randomUUID();
+    const sid = "session1";
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     sessions.push({ sid, userId: user.id, expires });
 
@@ -19,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json(
       {
-        message: "[oAuth] User logged in successfully.",
+        message: "User logged in successfully.",
         data: {
           email: user.email,
           first_name: user.first_name,
@@ -39,6 +53,7 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (err: unknown) {
+    console.log(err);
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: errorMessage }, { status: 401 });
   }
