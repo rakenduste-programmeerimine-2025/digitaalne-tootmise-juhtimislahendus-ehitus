@@ -12,6 +12,7 @@ export const users = [
     last_name: "WhathaFahn",
     password: "password123",
     is_active: true,
+
   },
 ];
 
@@ -53,7 +54,12 @@ export const sessions: Session[] = [
     sid: "session1",
     userId: "1",
     expires: new Date("2026-01-03T00:00:00Z"),
-  }
+  },
+  {
+    sid: "test-session-1",
+    userId: "1",
+    expires: new Date("2026-12-31T23:59:59Z"),
+  },
 ];
 
 export const scopes = [

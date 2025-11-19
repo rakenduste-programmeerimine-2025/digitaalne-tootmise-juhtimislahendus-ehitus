@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sessions, organizations, usersInOrganizations, users, projects } from "@/lib/memoryDb";
+import {
+  sessions,
+  organizations,
+  usersInOrganizations,
+  users,
+  projects,
+} from "@/lib/memoryDb";
 
 export async function GET(req: NextRequest) {
   try {
     const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("[oAuth] No session");
+    if (!sid) throw new Error("No session");
 
     const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("[oAuth] Session not found");
+    if (index === -1) throw new Error("Session not found");
 
     const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("[oAuth] User not found");
+    if (!user) throw new Error("User not found");
 
     const userOrganizationsIds = usersInOrganizations
       .filter((uio) => uio.userId === user.id)
@@ -20,8 +26,10 @@ export async function GET(req: NextRequest) {
       userOrganizationsIds.includes(org.id)
     );
 
-    return NextResponse.json({ organizations: userOrganizations }, { status: 200 });
-
+    return NextResponse.json(
+      { organizations: userOrganizations },
+      { status: 200 }
+    );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 400 });
@@ -31,16 +39,27 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("[oAuth] No session");
+    if (!sid) throw new Error("No session");
 
     const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("[oAuth] Session not found");
+    if (index === -1) throw new Error("Session not found");
 
     const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("[oAuth] User not found");
+    if (!user) throw new Error("ser not found");
 
-    const { name } = await req.json();
-    if (!name) throw new Error("Organization name is required");
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const { name } = body ?? {};
+    if (!name)
+      return NextResponse.json(
+        { error: "Organization name is required" },
+        { status: 400 }
+      );
 
     const newOrganization = {
       id: `org_${Date.now()}`,
@@ -54,8 +73,10 @@ export async function POST(req: NextRequest) {
       organizationId: newOrganization.id,
     });
 
-    return NextResponse.json({ organization: newOrganization }, { status: 201 });
-
+    return NextResponse.json(
+      { organization: newOrganization },
+      { status: 201 }
+    );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 400 });
@@ -65,17 +86,32 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("[oAuth] No session");
+    if (!sid) throw new Error("No session");
 
     const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("[oAuth] Session not found");
+    if (index === -1) throw new Error("Session not found");
 
     const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("[oAuth] User not found");
+    if (!user) throw new Error("User not found");
 
-    const { id, name } = await req.json();
-    if (!id) throw new Error("Organization ID is required");
-    if (!name) throw new Error("Organization name is required");
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const { id, name } = body ?? {};
+    if (!id)
+      return NextResponse.json(
+        { error: "Organization ID is required" },
+        { status: 400 }
+      );
+    if (!name)
+      return NextResponse.json(
+        { error: "Organization name is required" },
+        { status: 400 }
+      );
 
     const orgIndex = organizations.findIndex((org) => org.id === id);
     if (orgIndex === -1) throw new Error("Organization not found");
@@ -85,8 +121,10 @@ export async function PUT(req: NextRequest) {
 
     organizations[orgIndex].name = name;
 
-    return NextResponse.json({ organization: organizations[orgIndex] }, { status: 200 });
-
+    return NextResponse.json(
+      { organization: organizations[orgIndex] },
+      { status: 200 }
+    );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 400 });
@@ -96,16 +134,27 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("[oAuth] No session");
+    if (!sid) throw new Error("No session");
 
     const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("[oAuth] Session not found");
+    if (index === -1) throw new Error("Session not found");
 
     const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("[oAuth] User not found");
+    if (!user) throw new Error("User not found");
 
-    const { id } = await req.json();
-    if (!id) throw new Error("Organization ID is required");
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const { id } = body ?? {};
+    if (!id)
+      return NextResponse.json(
+        { error: "Organization ID is required" },
+        { status: 400 }
+      );
 
     const orgIndex = organizations.findIndex((org) => org.id === id);
     if (orgIndex === -1) throw new Error("Organization not found");
@@ -127,8 +176,10 @@ export async function DELETE(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ message: "Organization deleted" }, { status: 200 });
-
+    return NextResponse.json(
+      { message: "Organization deleted" },
+      { status: 200 }
+    );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 400 });

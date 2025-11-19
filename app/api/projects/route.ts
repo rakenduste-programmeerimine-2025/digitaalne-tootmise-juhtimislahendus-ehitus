@@ -93,7 +93,7 @@ export async function PUT(req: NextRequest) {
     if (index === -1) throw new Error("Session not found");
 
     const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("[oAuth] User not found");
+    if (!user) throw new Error("User not found");
 
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId");

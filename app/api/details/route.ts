@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sessions, project_details, usersInOrganizations, users, projects } from "@/lib/memoryDb";
+import {
+  sessions,
+  project_details,
+  usersInOrganizations,
+  users,
+  projects,
+} from "@/lib/memoryDb";
 
 export async function GET(req: NextRequest) {
   try {
     const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("[oAuth] No session");
+    if (!sid) throw new Error("No session");
 
     const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("[oAuth] Session not found");
+    if (index === -1) throw new Error("Session not found");
 
     const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("[oAuth] User not found");
+    if (!user) throw new Error("User not found");
 
     const { searchParams } = new URL(req.url);
     const organizationId = searchParams.get("organizationId");
@@ -39,16 +45,16 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("[oAuth] No session");
+    if (!sid) throw new Error("No session");
 
     const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("[oAuth] Session not found");
+    if (index === -1) throw new Error("Session not found");
 
     const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("[oAuth] User not found");
+    if (!user) throw new Error("User not found");
 
-    const { organizationId, projectId, detail } = await req.json();
-    if (!organizationId || !projectId || !detail) {
+    const { organizationId, projectId } = await req.json();
+    if (!organizationId || !projectId) {
       throw new Error("Missing required fields");
     }
 
@@ -68,7 +74,10 @@ export async function POST(req: NextRequest) {
     };
     project_details.push(newDetail);
 
-    return NextResponse.json({ message: "Project detail added", detail: newDetail });
+    return NextResponse.json({
+      message: "Project detail added",
+      detail: newDetail,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 400 });
@@ -78,18 +87,19 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("[oAuth] No session");
+    if (!sid) throw new Error("No session");
 
     const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("[oAuth] Session not found");
+    if (index === -1) throw new Error("Session not found");
 
     const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("[oAuth] User not found");
+    if (!user) throw new Error("ser not found");
 
     const { searchParams } = new URL(req.url);
     const detailId = searchParams.get("detailId");
     const organizationId = searchParams.get("organizationId");
-    if (!detailId || !organizationId) throw new Error("Missing required parameters");
+    if (!detailId || !organizationId)
+      throw new Error("Missing required parameters");
 
     const isMember = usersInOrganizations.some(
       (uio) => uio.userId === user.id && uio.organizationId === organizationId
@@ -100,9 +110,12 @@ export async function DELETE(req: NextRequest) {
     if (detailIndex === -1) throw new Error("Project detail not found");
 
     const project = projects.find(
-      (p) => p.id === project_details[detailIndex].projectId && p.organizationId === organizationId
+      (p) =>
+        p.id === project_details[detailIndex].projectId &&
+        p.organizationId === organizationId
     );
-    if (!project) throw new Error("Project detail does not belong to the organization");
+    if (!project)
+      throw new Error("Project detail does not belong to the organization");
 
     project_details.splice(detailIndex, 1);
 
