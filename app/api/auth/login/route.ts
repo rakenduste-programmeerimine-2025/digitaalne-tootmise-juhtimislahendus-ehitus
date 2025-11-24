@@ -33,12 +33,13 @@ export async function POST(req: NextRequest) {
 
     const sid = crypto.randomUUID();
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    
+
     const { error: sessionError } = await supabase
       .from("sessions")
       .insert({ id: sid, user_id: user.id, expires });
 
     if (sessionError) {
+      console.log(sessionError);
       throw new Error("Failed to create session");
     }
 
