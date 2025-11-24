@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
-import { users, sessions, scopes } from "@/lib/memoryDb";
-import jsonwebtoken from "jsonwebtoken";
+import { supabase } from "@/lib/supabaseClient";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,16 +18,36 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const user = users.find(
-      (u) => u.email === email && u.password === password && u.is_active
-    );
-    if (!user) throw new Error("Invalid credentials");
 
-    const sid = "session1";
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    sessions.push({ sid, userId: user.id, expires });
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .eq("password", password)
+      .eq("is_active", true)
+      .single();
 
-    //tbd: add jwt token that stores user session.
+    if (userError || !user) {
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    }
+
+    const sid = crypto.randomUUID();
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    
+    const { error: sessionError } = await supabase
+      .from("sessions")
+      .insert({ id: sid, user_id: user.id, expires });
+
+    if (sessionError) {
+      throw new Error("Failed to create session");
+    }
+
+    const { data: userScopes } = await supabase
+      .from("users_scopes")
+      .select("scope_id, scopes(scope)")
+      .eq("user_id", user.id);
+
+    const scopes = userScopes?.map((us: any) => us.scopes?.scope) || [];
 
     const response = NextResponse.json(
       {
@@ -38,7 +56,7 @@ export async function POST(req: NextRequest) {
           email: user.email,
           first_name: user.first_name,
           last_name: user.last_name,
-          scopes: scopes.map((s) => s.scope),
+          scopes: scopes,
         },
       },
       { status: 200 }

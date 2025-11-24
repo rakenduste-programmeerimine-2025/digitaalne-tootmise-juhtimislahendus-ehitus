@@ -1,39 +1,68 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  sessions,
-  project_details,
-  usersInOrganizations,
-  users,
-  projects,
-} from "@/lib/memoryDb";
+import { supabase } from "@/lib/supabaseClient";
+
+async function getUserFromSession(req: NextRequest) {
+  const sid = req.cookies.get("sid")?.value;
+  if (!sid) return null;
+
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("user_id")
+    .eq("id", sid)
+    .single();
+
+  if (!session) return null;
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", session.user_id)
+    .single();
+
+  return user;
+}
+
+async function isMember(userId: string, organizationId: number) {
+  const { data } = await supabase
+    .from("users_in_organizations")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("organization_id", organizationId)
+    .single();
+  return !!data;
+}
 
 export async function GET(req: NextRequest) {
   try {
-    const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("No session");
-
-    const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("Session not found");
-
-    const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("User not found");
+    const user = await getUserFromSession(req);
+    if (!user) throw new Error("Unauthorized");
 
     const { searchParams } = new URL(req.url);
-    const organizationId = searchParams.get("organizationId");
-    if (!organizationId) throw new Error("Missing organizationId parameter");
+    const organizationIdStr = searchParams.get("organizationId");
+    if (!organizationIdStr) throw new Error("Missing organizationId parameter");
+    const organizationId = parseInt(organizationIdStr);
 
-    const isMember = usersInOrganizations.some(
-      (uio) => uio.userId === user.id && uio.organizationId === organizationId
-    );
-    if (!isMember) throw new Error("User is not a member of the organization");
+    if (!(await isMember(user.id, organizationId))) {
+      throw new Error("User is not a member of the organization");
+    }
 
-    const organizationProjects = projects.filter(
-      (p) => p.organizationId === organizationId
-    );
+    const { data: projects } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("organization_id", organizationId);
 
-    const details = project_details.filter((detail) =>
-      organizationProjects.some((proj) => proj.id === detail.projectId)
-    );
+    if (!projects || projects.length === 0) {
+      return NextResponse.json({ project_details: [] });
+    }
+
+    const projectIds = projects.map((p) => p.id);
+
+    const { data: details, error } = await supabase
+      .from("project_details")
+      .select("*")
+      .in("project_id", projectIds);
+
+    if (error) throw error;
 
     return NextResponse.json({ project_details: details });
   } catch (err: unknown) {
@@ -44,35 +73,39 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("No session");
-
-    const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("Session not found");
-
-    const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("User not found");
+    const user = await getUserFromSession(req);
+    if (!user) throw new Error("Unauthorized");
 
     const { organizationId, projectId } = await req.json();
     if (!organizationId || !projectId) {
       throw new Error("Missing required fields");
     }
 
-    const isMember = usersInOrganizations.some(
-      (uio) => uio.userId === user.id && uio.organizationId === organizationId
-    );
-    if (!isMember) throw new Error("User is not a member of the organization");
+    if (!(await isMember(user.id, organizationId))) {
+      throw new Error("User is not a member of the organization");
+    }
 
-    const project = projects.find(
-      (p) => p.id === projectId && p.organizationId === organizationId
-    );
+    const { data: project } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("id", projectId)
+      .eq("organization_id", organizationId)
+      .single();
+
     if (!project) throw new Error("Project not found in the organization");
 
-    const newDetail = {
-      id: `detail_${Date.now()}`,
-      projectId,
-    };
-    project_details.push(newDetail);
+    const { data: newDetail, error } = await supabase
+      .from("project_details")
+      .insert({
+        project_id: projectId,
+        status: "Pending",
+        name: "New Detail",
+        location: "Unknown",
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json({
       message: "Project detail added",
@@ -86,38 +119,46 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("No session");
-
-    const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("Session not found");
-
-    const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("ser not found");
+    const user = await getUserFromSession(req);
+    if (!user) throw new Error("Unauthorized");
 
     const { searchParams } = new URL(req.url);
-    const detailId = searchParams.get("detailId");
-    const organizationId = searchParams.get("organizationId");
-    if (!detailId || !organizationId)
+    const detailIdStr = searchParams.get("detailId");
+    const organizationIdStr = searchParams.get("organizationId");
+    if (!detailIdStr || !organizationIdStr)
       throw new Error("Missing required parameters");
+    
+    const detailId = parseInt(detailIdStr);
+    const organizationId = parseInt(organizationIdStr);
 
-    const isMember = usersInOrganizations.some(
-      (uio) => uio.userId === user.id && uio.organizationId === organizationId
-    );
-    if (!isMember) throw new Error("User is not a member of the organization");
+    if (!(await isMember(user.id, organizationId))) {
+      throw new Error("User is not a member of the organization");
+    }
 
-    const detailIndex = project_details.findIndex((d) => d.id === detailId);
-    if (detailIndex === -1) throw new Error("Project detail not found");
+    const { data: detail } = await supabase
+      .from("project_details")
+      .select("project_id")
+      .eq("id", detailId)
+      .single();
 
-    const project = projects.find(
-      (p) =>
-        p.id === project_details[detailIndex].projectId &&
-        p.organizationId === organizationId
-    );
-    if (!project)
+    if (!detail) throw new Error("Project detail not found");
+
+    const { data: project } = await supabase
+      .from("projects")
+      .select("organization_id")
+      .eq("id", detail.project_id)
+      .single();
+
+    if (!project || project.organization_id !== organizationId) {
       throw new Error("Project detail does not belong to the organization");
+    }
 
-    project_details.splice(detailIndex, 1);
+    const { error } = await supabase
+      .from("project_details")
+      .delete()
+      .eq("id", detailId);
+
+    if (error) throw error;
 
     return NextResponse.json({ message: "Project detail deleted" });
   } catch (err: unknown) {

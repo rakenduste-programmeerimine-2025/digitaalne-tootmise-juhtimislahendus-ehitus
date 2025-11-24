@@ -1,46 +1,68 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
-import {
-  sessions,
-  organizations,
-  usersInOrganizations,
-  users,
-  projects,
-} from "@/lib/memoryDb";
+import { supabase } from "@/lib/supabaseClient";
 
-const userScopesMap: Record<string, number[]> = {
-  // user "1" is admin (scope 6)
-  "1": [6],
-};
+async function getUserFromSession(req: NextRequest) {
+  const sid = req.cookies.get("sid")?.value;
+  if (!sid) return null;
 
-function hasScope(userId: string, scopeId: number) {
-  const scopes = userScopesMap[userId] ?? [];
-  return scopes.includes(scopeId);
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("user_id")
+    .eq("id", sid)
+    .single();
+
+  if (!session) return null;
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", session.user_id)
+    .single();
+
+  return user;
+}
+
+async function hasScope(userId: string, scopeId: number) {
+  const { data } = await supabase
+    .from("users_scopes")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("scope_id", scopeId)
+    .single();
+  return !!data;
+}
+
+async function isMember(userId: string, organizationId: number) {
+  const { data } = await supabase
+    .from("users_in_organizations")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("organization_id", organizationId)
+    .single();
+  return !!data;
 }
 
 export async function GET(req: NextRequest) {
   try {
-    const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("No session");
-
-    const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("Session not found");
-
-    const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("User not found");
+    const user = await getUserFromSession(req);
+    if (!user) throw new Error("Unauthorized");
 
     const { searchParams } = new URL(req.url);
-    const organizationId = searchParams.get("organizationId");
-    if (!organizationId) throw new Error("Missing organizationId parameter");
+    const organizationIdStr = searchParams.get("organizationId");
+    if (!organizationIdStr) throw new Error("Missing organizationId parameter");
+    const organizationId = parseInt(organizationIdStr);
 
-    const isMember = usersInOrganizations.some(
-      (uio) => uio.userId === user.id && uio.organizationId === organizationId
-    );
-    if (!isMember) throw new Error("User is not a member of the organization");
+    if (!(await isMember(user.id, organizationId))) {
+      throw new Error("User is not a member of the organization");
+    }
 
-    const orgProjects = projects.filter(
-      (project) => project.organizationId === organizationId
-    );
+    const { data: orgProjects, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("organization_id", organizationId);
+
+    if (error) throw error;
+
     return NextResponse.json({ projects: orgProjects });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -50,32 +72,27 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("No session");
-
-    const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("Session not found");
-
-    const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("User not found");
+    const user = await getUserFromSession(req);
+    if (!user) throw new Error("Unauthorized");
 
     const body = await req.json();
     const { name, organizationId } = body;
     if (!name) throw new Error("Missing project name");
     if (!organizationId) throw new Error("Missing organizationId");
-
-    // require scope 6 to create
-    if (!hasScope(user.id, 6))
+    if (!(await hasScope(user.id, 6)))
       throw new Error("Access denied: insufficient scopes");
 
-    const isMember = usersInOrganizations.some(
-      (uio) => uio.userId === user.id && uio.organizationId === organizationId
-    );
-    if (!isMember) throw new Error("User is not a member of the organization");
+    if (!(await isMember(user.id, organizationId))) {
+      throw new Error("User is not a member of the organization");
+    }
 
-    const id = crypto.randomUUID();
-    const project = { id, name, organizationId };
-    projects.push(project);
+    const { data: project, error } = await supabase
+      .from("projects")
+      .insert({ name, organization_id: organizationId, status: "active" })
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json({ project }, { status: 201 });
   } catch (err: unknown) {
@@ -86,35 +103,38 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("No session");
-
-    const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("Session not found");
-
-    const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("User not found");
+    const user = await getUserFromSession(req);
+    if (!user) throw new Error("Unauthorized");
 
     const { searchParams } = new URL(req.url);
-    const projectId = searchParams.get("projectId");
-    if (!projectId) throw new Error("Missing projectId parameter");
+    const projectIdStr = searchParams.get("projectId");
+    if (!projectIdStr) throw new Error("Missing projectId parameter");
+    const projectId = parseInt(projectIdStr);
 
-    const projectIndex = projects.findIndex((p) => p.id === projectId);
-    if (projectIndex === -1) throw new Error("Project not found");
+    const { data: currentProject } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", projectId)
+      .single();
 
-    const project = projects[projectIndex];
+    if (!currentProject) throw new Error("Project not found");
 
-    const isMember = usersInOrganizations.some(
-      (uio) =>
-        uio.userId === user.id && uio.organizationId === project.organizationId
-    );
-    if (!isMember) throw new Error("User is not a member of the organization");
+    if (!(await isMember(user.id, currentProject.organization_id))) {
+      throw new Error("User is not a member of the organization");
+    }
 
     const updates = await req.json();
-    // allow the editing of name and other simple fields, but not id or organizationId
-    if (typeof updates.name === "string") project.name = updates.name;
+    const { name } = updates;
 
-    projects[projectIndex] = project;
+    const { data: project, error } = await supabase
+      .from("projects")
+      .update({ name })
+      .eq("id", projectId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
     return NextResponse.json({ project });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -124,28 +144,31 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("No session");
-
-    const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("Session not found");
-
-    const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("User not found");
-
-    // require scope 6 to delete
-    if (!hasScope(user.id, 6))
+    const user = await getUserFromSession(req);
+    if (!user) throw new Error("Unauthorized");
+    if (!(await hasScope(user.id, 6)))
       throw new Error("Insufficient scopes to delete project");
 
     const { searchParams } = new URL(req.url);
-    const projectId = searchParams.get("projectId");
-    if (!projectId) throw new Error("Missing projectId parameter");
+    const projectIdStr = searchParams.get("projectId");
+    if (!projectIdStr) throw new Error("Missing projectId parameter");
+    const projectId = parseInt(projectIdStr);
 
-    const projectIndex = projects.findIndex((p) => p.id === projectId);
-    if (projectIndex === -1) throw new Error("Project not found");
+    const { data: currentProject } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", projectId)
+      .single();
 
-    const [deleted] = projects.splice(projectIndex, 1);
-    return NextResponse.json({ deleted });
+    if (!currentProject) throw new Error("Project not found");
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", projectId);
+
+    if (error) throw error;
+
+    return NextResponse.json({ deleted: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 400 });
