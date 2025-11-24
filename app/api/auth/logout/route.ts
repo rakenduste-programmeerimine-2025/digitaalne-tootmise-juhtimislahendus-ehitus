@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sessions } from "@/lib/memoryDb";
+import { supabase } from "@/lib/supabaseClient";
 
 export async function POST(req: NextRequest) {
   try {
     const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("[oAuth] No session");
+    if (!sid) throw new Error("No session");
 
-    const index = sessions.findIndex((s) => s.sid === sid);
-    if (index !== -1) sessions.splice(index, 1);
+    const { error } = await supabase.from("sessions").delete().eq("id", sid);
+
+    if (error) {
+      console.error("Logout error:", error);
+    }
 
     const response = NextResponse.json(
-      { message: "[oAuth] User logged out successfully." },
+      { message: "User logged out successfully." },
       { status: 200 }
     );
     response.cookies.delete("sid");

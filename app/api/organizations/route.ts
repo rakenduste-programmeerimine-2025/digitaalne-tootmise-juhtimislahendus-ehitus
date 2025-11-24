@@ -1,33 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  sessions,
-  organizations,
-  usersInOrganizations,
-  users,
-  projects,
-} from "@/lib/memoryDb";
+import { supabase } from "@/lib/supabaseClient";
+
+async function getUserFromSession(req: NextRequest) {
+  const sid = req.cookies.get("sid")?.value;
+  if (!sid) return null;
+
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("user_id")
+    .eq("id", sid)
+    .single();
+
+  if (!session) return null;
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", session.user_id)
+    .single();
+
+  return user;
+}
 
 export async function GET(req: NextRequest) {
   try {
-    const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("No session");
+    const user = await getUserFromSession(req);
+    if (!user) throw new Error("Unauthorized");
 
-    const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("Session not found");
+    const { data: userOrganizations, error } = await supabase
+      .from("users_in_organizations")
+      .select("organization_id, organizations(*)")
+      .eq("user_id", user.id);
 
-    const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("User not found");
+    if (error) throw error;
 
-    const userOrganizationsIds = usersInOrganizations
-      .filter((uio) => uio.userId === user.id)
-      .map((uio) => uio.organizationId);
-
-    const userOrganizations = organizations.filter((org) =>
-      userOrganizationsIds.includes(org.id)
-    );
+    const organizations = userOrganizations.map((uo: any) => uo.organizations);
 
     return NextResponse.json(
-      { organizations: userOrganizations },
+      { organizations },
       { status: 200 }
     );
   } catch (err: unknown) {
@@ -38,14 +48,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("No session");
-
-    const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("Session not found");
-
-    const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("ser not found");
+    const user = await getUserFromSession(req);
+    if (!user) throw new Error("Unauthorized");
 
     let body: any;
     try {
@@ -61,17 +65,19 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
 
-    const newOrganization = {
-      id: `org_${Date.now()}`,
-      name,
-      ownerId: user.id,
-    };
+    const { data: newOrganization, error: orgError } = await supabase
+      .from("organizations")
+      .insert({ name, owner_id: user.id })
+      .select()
+      .single();
 
-    organizations.push(newOrganization);
-    usersInOrganizations.push({
-      userId: user.id,
-      organizationId: newOrganization.id,
-    });
+    if (orgError) throw orgError;
+
+    const { error: linkError } = await supabase
+      .from("users_in_organizations")
+      .insert({ user_id: user.id, organization_id: newOrganization.id });
+
+    if (linkError) throw linkError;
 
     return NextResponse.json(
       { organization: newOrganization },
@@ -85,14 +91,8 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("No session");
-
-    const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("Session not found");
-
-    const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("User not found");
+    const user = await getUserFromSession(req);
+    if (!user) throw new Error("Unauthorized");
 
     let body: any;
     try {
@@ -113,16 +113,28 @@ export async function PUT(req: NextRequest) {
         { status: 400 }
       );
 
-    const orgIndex = organizations.findIndex((org) => org.id === id);
-    if (orgIndex === -1) throw new Error("Organization not found");
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-    if (organizations[orgIndex].ownerId !== user.id)
+    if (!org) throw new Error("Organization not found");
+
+    if (org.owner_id !== user.id)
       throw new Error("Only the owner can update the organization");
 
-    organizations[orgIndex].name = name;
+    const { data: updatedOrg, error } = await supabase
+      .from("organizations")
+      .update({ name })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(
-      { organization: organizations[orgIndex] },
+      { organization: updatedOrg },
       { status: 200 }
     );
   } catch (err: unknown) {
@@ -133,14 +145,8 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const sid = req.cookies.get("sid")?.value;
-    if (!sid) throw new Error("No session");
-
-    const index = sessions.findIndex((s) => s.sid === sid);
-    if (index === -1) throw new Error("Session not found");
-
-    const user = users.find((u) => u.id === sessions[index].userId);
-    if (!user) throw new Error("User not found");
+    const user = await getUserFromSession(req);
+    if (!user) throw new Error("Unauthorized");
 
     let body: any;
     try {
@@ -156,25 +162,23 @@ export async function DELETE(req: NextRequest) {
         { status: 400 }
       );
 
-    const orgIndex = organizations.findIndex((org) => org.id === id);
-    if (orgIndex === -1) throw new Error("Organization not found");
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-    if (organizations[orgIndex].ownerId !== user.id)
+    if (!org) throw new Error("Organization not found");
+
+    if (org.owner_id !== user.id)
       throw new Error("Only the owner can delete the organization");
 
-    organizations.splice(orgIndex, 1);
+    const { error } = await supabase
+      .from("organizations")
+      .delete()
+      .eq("id", id);
 
-    for (let i = usersInOrganizations.length - 1; i >= 0; i--) {
-      if (usersInOrganizations[i].organizationId === id) {
-        usersInOrganizations.splice(i, 1);
-      }
-    }
-
-    for (let i = projects.length - 1; i >= 0; i--) {
-      if (projects[i].organizationId === id) {
-        projects.splice(i, 1);
-      }
-    }
+    if (error) throw error;
 
     return NextResponse.json(
       { message: "Organization deleted" },
