@@ -34,7 +34,7 @@ function page() {
                 throw new Error(data.error || 'Failed to login');
             }
 
-            router.push('/home');
+            router.push('/app');
         } catch (err: any) {
             setError(err.message);
         } finally {
