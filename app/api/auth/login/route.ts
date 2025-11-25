@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabaseClient";
+import bcrypt from "bcrypt";
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,11 +24,16 @@ export async function POST(req: NextRequest) {
       .from("users")
       .select("*")
       .eq("email", email)
-      .eq("password", password)
       .eq("is_active", true)
       .single();
 
     if (userError || !user) {
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatch) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
