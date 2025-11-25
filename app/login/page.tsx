@@ -34,6 +34,7 @@ function page() {
                 throw new Error(data.error || 'Failed to login');
             }
 
+            localStorage.setItem('user', JSON.stringify(data.data));
             router.push('/app');
         } catch (err: any) {
             setError(err.message);
