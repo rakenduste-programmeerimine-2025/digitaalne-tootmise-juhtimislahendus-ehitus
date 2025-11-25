@@ -49,6 +49,7 @@ function register() {
         throw new Error(data.error || 'Something went wrong');
       }
 
+      localStorage.setItem('user', JSON.stringify(data.data.user));
       router.push('/app');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Registration failed';
