@@ -5,14 +5,31 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 
+import { useState, useEffect } from 'react';
+
 function page() {
   const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const res = await fetch('/api/me');
+        if (res.ok) {
+          setIsLoggedIn(true);
+        }
+      } catch (err) {
+        console.error("Session check failed", err);
+      }
+    };
+    checkSession();
+  }, []);
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans">
       <header className="flex justify-between items-center p-6 border-b border-slate-100">
         <Logo />
-        <Button variant="outline" onClick={() => router.push("/login")}>
-          LOGIN
+        <Button variant="outline" onClick={() => router.push(isLoggedIn ? "/app" : "/login")}>
+          {isLoggedIn ? "DASHBOARD" : "LOGIN"}
         </Button>
       </header>
 
@@ -34,8 +51,8 @@ function page() {
             <p className="text-slate-500 mb-6">
               Start tracking your inventory today.
             </p>
-            <Button className="w-full" onClick={() => router.push("/login")}>
-              Start Now
+            <Button className="w-full" onClick={() => router.push(isLoggedIn ? "/app" : "/login")}>
+              {isLoggedIn ? "Go to Dashboard" : "Start Now"}
             </Button>
           </Card>
 
