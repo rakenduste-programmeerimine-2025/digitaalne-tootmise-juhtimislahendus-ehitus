@@ -63,7 +63,7 @@ function page() {
             <p className="text-slate-500 mb-6">
               Discover our advanced features.
             </p>
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" className="w-full" onClick={() => router.push("/documentation")}>
               Read Documentation
             </Button>
           </Card>
@@ -72,11 +72,11 @@ function page() {
 
       <footer className="border-t border-slate-100 p-6">
         <div className="flex justify-center space-x-8 text-sm text-slate-500 font-medium">
-          <button className="hover:text-slate-900">ABOUT</button>
+          <button className="hover:text-slate-900" onClick={() => router.push("/about")}>ABOUT</button>
           <span className="text-slate-300">|</span>
-          <button className="hover:text-slate-900">CONTACT</button>
+          <button className="hover:text-slate-900" onClick={() => router.push("/contact")}>CONTACT</button>
           <span className="text-slate-300">|</span>
-          <button className="hover:text-slate-900">PRIVACY</button>
+          <button className="hover:text-slate-900" onClick={() => router.push("/privacy")}>PRIVACY</button>
         </div>
       </footer>
     </div>
