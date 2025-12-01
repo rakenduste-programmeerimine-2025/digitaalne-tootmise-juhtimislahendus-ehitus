@@ -60,3 +60,13 @@ export interface UserInOrganization {
   user_id: string;
   organization_id: number;
 }
+
+export interface ProjectDetailsLog {
+  id: number;
+  organization_id: number;
+  project_id: number;
+  detail_id: number;
+  old_status: string;
+  new_status: string;
+  created_at: string;
+}
