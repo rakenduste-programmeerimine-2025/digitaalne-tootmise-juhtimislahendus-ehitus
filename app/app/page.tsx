@@ -129,7 +129,7 @@ export default function Dashboard() {
   };
 
   const onSelectProject = (projectId: number) => {
-      console.log("Selected project:", projectId);
+      router.push(`/projects/${projectId}`);
   };
 
   if (loading && organizations.length === 0) {
