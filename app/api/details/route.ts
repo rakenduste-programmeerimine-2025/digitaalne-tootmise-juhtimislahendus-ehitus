@@ -39,17 +39,39 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const organizationIdStr = searchParams.get("organizationId");
-    if (!organizationIdStr) throw new Error("Missing organizationId parameter");
-    const organizationId = parseInt(organizationIdStr);
+    const projectIdStr = searchParams.get("projectId");
+
+    if (!organizationIdStr && !projectIdStr) {
+        throw new Error("Missing organizationId or projectId parameter");
+    }
+
+    let organizationId: number;
+
+    if (projectIdStr) {
+        const projectId = parseInt(projectIdStr);
+        const { data: project } = await supabase
+            .from("projects")
+            .select("organization_id")
+            .eq("id", projectId)
+            .single();
+        
+        if (!project) throw new Error("Project not found");
+        organizationId = project.organization_id;
+    } else {
+        organizationId = parseInt(organizationIdStr!);
+    }
 
     if (!(await isMember(user.id, organizationId))) {
       throw new Error("User is not a member of the organization");
     }
 
-    const { data: projects } = await supabase
-      .from("projects")
-      .select("id")
-      .eq("organization_id", organizationId);
+    let query = supabase.from("projects").select("id").eq("organization_id", organizationId);
+    
+    if (projectIdStr) {
+        query = query.eq("id", parseInt(projectIdStr));
+    }
+
+    const { data: projects } = await query;
 
     if (!projects || projects.length === 0) {
       return NextResponse.json({ project_details: [] });
