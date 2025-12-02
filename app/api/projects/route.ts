@@ -22,24 +22,24 @@ async function getUserFromSession(req: NextRequest) {
   return user;
 }
 
-async function hasScope(userId: string, scopeId: number) {
+async function getCompanyRole(userId: string, organizationId: number) {
   const { data } = await supabase
-    .from("users_scopes")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("scope_id", scopeId)
-    .single();
-  return !!data;
-}
-
-async function isMember(userId: string, organizationId: number) {
-  const { data } = await supabase
-    .from("users_in_organizations")
-    .select("id")
+    .from("user_company_roles")
+    .select("role_id")
     .eq("user_id", userId)
     .eq("organization_id", organizationId)
     .single();
-  return !!data;
+  return data?.role_id;
+}
+
+async function getProjectRole(userId: string, projectId: number) {
+  const { data } = await supabase
+    .from("user_project_roles")
+    .select("role_id")
+    .eq("user_id", userId)
+    .eq("project_id", projectId)
+    .single();
+  return data?.role_id;
 }
 
 export async function GET(req: NextRequest) {
@@ -49,21 +49,35 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const organizationIdStr = searchParams.get("organizationId");
-    if (!organizationIdStr) throw new Error("Missing organizationId parameter");
-    const organizationId = parseInt(organizationIdStr);
 
-    if (!(await isMember(user.id, organizationId))) {
-      throw new Error("User is not a member of the organization");
+    if (!organizationIdStr) {
+      throw new Error("Missing organizationId parameter");
     }
 
-    const { data: orgProjects, error } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("organization_id", organizationId);
+    const organizationId = parseInt(organizationIdStr);
+    const companyRole = await getCompanyRole(user.id, organizationId);
 
-    if (error) throw error;
+    let projects;
 
-    return NextResponse.json({ projects: orgProjects });
+    if (companyRole === 1 || companyRole === 2) {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("organization_id", organizationId);
+      if (error) throw error;
+      projects = data;
+    } else {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*, user_project_roles!inner(role_id)")
+        .eq("organization_id", organizationId)
+        .eq("user_project_roles.user_id", user.id);
+
+      if (error) throw error;
+      projects = data;
+    }
+
+    return NextResponse.json({ projects });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 400 });
@@ -79,23 +93,35 @@ export async function POST(req: NextRequest) {
     const { name, organizationId } = body;
     if (!name) throw new Error("Missing project name");
     if (!organizationId) throw new Error("Missing organizationId");
-    if (!(await hasScope(user.id, 6)))
-      throw new Error("Access denied: insufficient scopes");
 
-    if (!(await isMember(user.id, organizationId))) {
-      throw new Error("User is not a member of the organization");
+    const companyRole = await getCompanyRole(user.id, organizationId);
+    if (companyRole !== 1 && companyRole !== 2) {
+      throw new Error("Access denied: Only Company Owner or Admin can create projects");
     }
-
-    const { data: project, error } = await supabase
+    const { data: project, error: createError } = await supabase
       .from("projects")
-      .insert({ name, organization_id: organizationId, status: "active" })
+      .insert({ name, organization_id: organizationId, status: "Active" })
       .select()
       .single();
 
-    if (error) throw error;
+    if (createError) throw createError;
+
+    const { error: roleError } = await supabase
+      .from("user_project_roles")
+      .insert({
+        user_id: user.id,
+        project_id: project.id,
+        role_id: 4 
+      });
+
+    if (roleError) {
+      throw roleError;
+      throw roleError;
+    }
 
     return NextResponse.json({ project }, { status: 201 });
   } catch (err: unknown) {
+    console.log(err);
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 400 });
   }
@@ -119,8 +145,11 @@ export async function PUT(req: NextRequest) {
 
     if (!currentProject) throw new Error("Project not found");
 
-    if (!(await isMember(user.id, currentProject.organization_id))) {
-      throw new Error("User is not a member of the organization");
+    const companyRole = await getCompanyRole(user.id, currentProject.organization_id);
+    const projectRole = await getProjectRole(user.id, projectId);
+
+    if (companyRole !== 1 && companyRole !== 2 && projectRole !== 4 && projectRole !== 5) {
+      throw new Error("Insufficient permissions to update project");
     }
 
     const updates = await req.json();
@@ -146,8 +175,6 @@ export async function DELETE(req: NextRequest) {
   try {
     const user = await getUserFromSession(req);
     if (!user) throw new Error("Unauthorized");
-    if (!(await hasScope(user.id, 6)))
-      throw new Error("Insufficient scopes to delete project");
 
     const { searchParams } = new URL(req.url);
     const projectIdStr = searchParams.get("projectId");
@@ -161,6 +188,14 @@ export async function DELETE(req: NextRequest) {
       .single();
 
     if (!currentProject) throw new Error("Project not found");
+
+    const companyRole = await getCompanyRole(user.id, currentProject.organization_id);
+    const projectRole = await getProjectRole(user.id, projectId);
+
+    if (companyRole !== 1 && companyRole !== 2 && projectRole !== 4) {
+      throw new Error("Insufficient permissions to delete project");
+    }
+
     const { error } = await supabase
       .from("projects")
       .delete()

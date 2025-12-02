@@ -74,6 +74,22 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        const { error: roleError } = await supabase
+            .from("user_company_roles")
+            .insert({
+                user_id: newUser.id,
+                organization_id: newOrg.id,
+                role_id: 1
+            });
+
+        if (roleError) {
+            console.error("Assign role error:", roleError);
+            return NextResponse.json(
+                { error: "Failed to assign company owner role" },
+                { status: 500 }
+            );
+        }
+
         const sid = crypto.randomUUID();
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 

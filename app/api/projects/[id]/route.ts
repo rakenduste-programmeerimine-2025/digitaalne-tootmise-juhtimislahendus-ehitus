@@ -22,14 +22,26 @@ async function getUserFromSession(req: NextRequest) {
   return user;
 }
 
-async function isMember(userId: string, organizationId: number) {
+// Helper: Check Company Role
+async function getCompanyRole(userId: string, organizationId: number) {
   const { data } = await supabase
-    .from("users_in_organizations")
-    .select("id")
+    .from("user_company_roles")
+    .select("role_id")
     .eq("user_id", userId)
     .eq("organization_id", organizationId)
     .single();
-  return !!data;
+  return data?.role_id;
+}
+
+// Helper: Check Project Role
+async function getProjectRole(userId: string, projectId: number) {
+  const { data } = await supabase
+    .from("user_project_roles")
+    .select("role_id")
+    .eq("user_id", userId)
+    .eq("project_id", projectId)
+    .single();
+  return data?.role_id;
 }
 
 export async function GET(
@@ -52,8 +64,14 @@ export async function GET(
 
     if (error || !project) throw new Error("Project not found");
 
-    if (!(await isMember(user.id, project.organization_id))) {
-      throw new Error("User is not a member of the organization");
+    const companyRole = await getCompanyRole(user.id, project.organization_id);
+    const projectRole = await getProjectRole(user.id, projectId);
+
+    // Access Check:
+    // 1. Company Owner/Admin (1, 2) -> Access
+    // 2. Project Member (4, 5, 6) -> Access
+    if (companyRole !== 1 && companyRole !== 2 && !projectRole) {
+      throw new Error("Access denied");
     }
 
     return NextResponse.json({ project });
