@@ -46,7 +46,7 @@
     - Project admin
     - Project engineer
 
-### Building/Apartment management
+### Digital Production Management Solution for Construction
 
 - Company Owner
   - Add projects
