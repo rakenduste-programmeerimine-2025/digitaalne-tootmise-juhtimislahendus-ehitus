@@ -21,6 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { CreateProjectModal } from "@/components/CreateProjectModal"
 
 interface Organization {
   id: number
@@ -52,6 +53,8 @@ export default function Dashboard() {
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [user, setUser] = useState<User | null>(null)
+
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
@@ -134,6 +137,10 @@ export default function Dashboard() {
     router.push(`/projects/${projectId}`)
   }
 
+  const handleProjectCreated = (newProject: Project) => {
+    setProjects([...projects, newProject])
+  }
+
   if (loading && organizations.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -159,7 +166,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -275,10 +281,18 @@ export default function Dashboard() {
         <Button
           variant="outline"
           className="w-full py-8 border-dashed border-2 border-slate-300 text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/50 flex gap-2"
+          onClick={() => setIsCreateModalOpen(true)}
         >
           <Plus className="h-5 w-5" /> Create New Project
         </Button>
       </main>
+
+      <CreateProjectModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onProjectCreated={handleProjectCreated}
+        organizationId={selectedOrgId}
+      />
     </div>
   )
 }
