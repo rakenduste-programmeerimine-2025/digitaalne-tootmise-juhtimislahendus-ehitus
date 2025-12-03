@@ -16,6 +16,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ScannerModal } from "@/components/ScannerModal"
+import { EditDetailModal } from "@/components/EditDetailModal"
 
 interface Project {
   id: number
@@ -51,6 +53,11 @@ function DetailsPage() {
   const [user, setUser] = useState<User | null>(null)
   const [filter, setFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState("All")
+
+  const [selectedDetail, setSelectedDetail] = useState<ProjectDetail | null>(
+    null,
+  )
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
@@ -103,6 +110,12 @@ function DetailsPage() {
 
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+  }
+
+  const handleUpdateDetail = (updatedDetail: ProjectDetail) => {
+    setInventory(prev =>
+      prev.map(item => (item.id === updatedDetail.id ? updatedDetail : item)),
+    )
   }
 
   if (loading) {
@@ -219,6 +232,7 @@ function DetailsPage() {
             />
           </div>
           <div className="flex gap-2">
+            <ScannerModal />
             <Button
               variant="outline"
               className="h-9 w-9 p-0"
@@ -250,9 +264,10 @@ function DetailsPage() {
                   <tr
                     key={row.id}
                     className="hover:bg-blue-50/50 cursor-pointer transition-colors group"
-                    onDoubleClick={() =>
-                      alert(`Opening Edit Menu for ${row.name}`)
-                    }
+                    onDoubleClick={() => {
+                      setSelectedDetail(row)
+                      setIsEditModalOpen(true)
+                    }}
                     title="Double click to edit"
                   >
                     <td className="px-6 py-4 font-mono text-slate-500">
@@ -304,6 +319,13 @@ function DetailsPage() {
           </div>
         </Card>
       </main>
+
+      <EditDetailModal
+        detail={selectedDetail}
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onUpdate={handleUpdateDetail}
+      />
     </div>
   )
 }

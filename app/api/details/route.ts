@@ -40,12 +40,34 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const organizationIdStr = searchParams.get("organizationId");
     const projectIdStr = searchParams.get("projectId");
+    const detailIdStr = searchParams.get("detailId");
 
-    if (!organizationIdStr && !projectIdStr) {
-        throw new Error("Missing organizationId or projectId parameter");
+    if (!organizationIdStr && !projectIdStr && !detailIdStr) {
+        throw new Error("Missing organizationId, projectId, or detailId parameter");
     }
 
     let organizationId: number;
+
+    if (detailIdStr) {
+        const detailId = parseInt(detailIdStr);
+        const { data: detail } = await supabase
+            .from("project_details")
+            .select("*, projects(organization_id)")
+            .eq("id", detailId)
+            .single();
+        
+        if (!detail) throw new Error("Detail not found");
+        
+        organizationId = detail.projects?.organization_id;
+
+        if (!organizationId) throw new Error("Organization not found for this detail");
+
+        if (!(await isMember(user.id, organizationId))) {
+            throw new Error("User is not a member of the organization");
+        }
+
+        return NextResponse.json({ project_details: [detail] });
+    }
 
     if (projectIdStr) {
         const projectId = parseInt(projectIdStr);
@@ -183,6 +205,78 @@ export async function DELETE(req: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({ message: "Project detail deleted" });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const user = await getUserFromSession(req);
+    if (!user) throw new Error("Unauthorized");
+
+    const { detailId, newStatus, name, location } = await req.json();
+
+    if (!detailId) {
+      throw new Error("Missing detailId");
+    }
+
+    const { data: currentDetail } = await supabase
+      .from("project_details")
+      .select("*, projects(organization_id)")
+      .eq("id", detailId)
+      .single();
+
+    if (!currentDetail) throw new Error("Detail not found");
+
+    const organizationId = currentDetail.projects?.organization_id;
+
+    if (!organizationId) throw new Error("Organization not found for this detail");
+
+    if (!(await isMember(user.id, organizationId))) {
+      throw new Error("User is not a member of the organization");
+    }
+
+    const updates: any = {};
+    if (newStatus) updates.status = newStatus;
+    if (name) updates.name = name;
+    if (location) updates.location = location;
+
+    if (Object.keys(updates).length === 0) {
+        return NextResponse.json({ message: "No changes provided" });
+    }
+
+    const { data: updatedDetail, error: updateError } = await supabase
+      .from("project_details")
+      .update(updates)
+      .eq("id", detailId)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    if (newStatus && newStatus !== currentDetail.status) {
+        const { error: logError } = await supabase
+        .from("project_details_log")
+        .insert({
+            organization_id: organizationId,
+            project_id: currentDetail.project_id,
+            detail_id: detailId,
+            old_status: currentDetail.status,
+            new_status: newStatus,
+        });
+
+        if (logError) {
+            console.error("Failed to create log entry:", logError);
+        }
+    }
+
+    return NextResponse.json({
+      message: "Detail updated",
+      detail: updatedDetail,
+    });
+
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 400 });
