@@ -25,6 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ScannerModal } from "@/components/ScannerModal"
 
 interface Project {
   id: number
@@ -175,6 +176,7 @@ export default function Page() {
           </div>
 
           <div className="flex items-center space-x-4">
+            <ScannerModal />
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
