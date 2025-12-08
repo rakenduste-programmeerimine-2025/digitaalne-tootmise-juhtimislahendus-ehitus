@@ -17,6 +17,15 @@ export interface User {
   password?: string;
 }
 
+export interface InvitedUser {
+  id: number;
+  email: string;
+  organization_id: number;
+  role_id: number;
+  created_at: string;
+  expire_at: string;
+}
+
 export interface Organization {
   id: number;
   name: string;

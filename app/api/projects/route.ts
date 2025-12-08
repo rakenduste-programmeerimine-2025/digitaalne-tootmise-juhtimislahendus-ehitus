@@ -116,6 +116,32 @@ export async function POST(req: NextRequest) {
 
     if (roleError) {
       throw roleError;
+    }
+
+    const { data: orgAdmins, error: orgAdminError } = await supabase
+        .from("user_company_roles")
+        .select("user_id")
+        .eq("organization_id", organizationId)
+        .in("role_id", [1, 2])
+        .neq("user_id", user.id);
+
+    if (!orgAdminError && orgAdmins && orgAdmins.length > 0) {
+        const adminInserts = orgAdmins.map((admin: any) => ({
+            user_id: admin.user_id,
+            project_id: project.id,
+            role_id: 5 
+        }));
+
+        const { error: adminInsertError } = await supabase
+            .from("user_project_roles")
+            .insert(adminInserts);
+        
+        if (adminInsertError) {
+            console.error("Failed to auto-add org admins to project:", adminInsertError);
+        }
+    }
+
+    if (roleError) {
       throw roleError;
     }
 

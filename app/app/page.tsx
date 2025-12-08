@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { OrgUserManagementModal } from "@/components/OrgUserManagementModal"
 import {
   Plus,
   Loader2,
@@ -10,6 +11,7 @@ import {
   LogOut,
   ArrowRight,
   ChevronDown,
+  Users,
 } from "lucide-react"
 import Logo from "@/components/Header"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -28,6 +30,7 @@ interface Organization {
   name: string
   created_at: string
   owner_id: string
+  role_id: number
 }
 
 interface Project {
@@ -39,6 +42,7 @@ interface Project {
 }
 
 interface User {
+  id: string
   email: string
   first_name: string
   last_name: string
@@ -55,6 +59,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null)
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isOrgUsersModalOpen, setIsOrgUsersModalOpen] = useState(false)
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
@@ -140,6 +145,10 @@ export default function Dashboard() {
   const handleProjectCreated = (newProject: Project) => {
     setProjects([...projects, newProject])
   }
+
+  const selectedOrg = organizations.find(o => o.id.toString() === selectedOrgId)
+  const canManageOrg =
+    selectedOrg && (selectedOrg.role_id === 1 || selectedOrg.role_id === 2)
 
   if (loading && organizations.length === 0) {
     return (
@@ -245,6 +254,17 @@ export default function Dashboard() {
                   ))}
                 </div>
               </div>
+
+              {canManageOrg && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsOrgUsersModalOpen(true)}
+                  title="Manage Organization Users"
+                >
+                  <Users className="h-5 w-5 text-slate-600" />
+                </Button>
+              )}
             </div>
           </div>
         </section>
@@ -293,6 +313,15 @@ export default function Dashboard() {
         onProjectCreated={handleProjectCreated}
         organizationId={selectedOrgId}
       />
+
+      {selectedOrgId && user && (
+        <OrgUserManagementModal
+          isOpen={isOrgUsersModalOpen}
+          onClose={() => setIsOrgUsersModalOpen(false)}
+          organizationId={selectedOrgId}
+          currentUserId={user.id}
+        />
+      )}
     </div>
   )
 }
