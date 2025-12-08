@@ -4,6 +4,7 @@ import Logo from "@/components/Header"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { ProjectUserManagementModal } from "@/components/ProjectUserManagementModal"
 import {
   AlertCircle,
   ArrowRight,
@@ -13,6 +14,7 @@ import {
   Truck,
   LogOut,
   Loader2,
+  Users,
 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
@@ -26,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ScannerModal } from "@/components/ScannerModal"
+import { ROLE_IDS, isOrgAdminOrOwner, isProjectAdminOrOwner } from "@/lib/roles"
 
 interface Project {
   id: number
@@ -62,6 +65,7 @@ interface ProjectStats {
 }
 
 interface User {
+  id: string
   email: string
   first_name: string
   last_name: string
@@ -78,6 +82,10 @@ export default function Page() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [user, setUser] = useState<User | null>(null)
+
+  const [userRole, setUserRole] = useState<number | null>(null)
+  const [orgRole, setOrgRole] = useState<number | null>(null)
+  const [isProjectUsersModalOpen, setIsProjectUsersModalOpen] = useState(false)
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
@@ -102,6 +110,8 @@ export default function Page() {
         if (!projectRes.ok) throw new Error("Failed to fetch project")
         const projectData = await projectRes.json()
         setProject(projectData.project)
+        setUserRole(projectData.user_role)
+        setOrgRole(projectData.org_role)
 
         const detailsRes = await fetch(`/api/details?projectId=${id}`)
         if (!detailsRes.ok) throw new Error("Failed to fetch project details")
@@ -136,6 +146,9 @@ export default function Page() {
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
   }
+
+  const canManageTeam =
+    isOrgAdminOrOwner(orgRole) || isProjectAdminOrOwner(userRole)
 
   if (loading) {
     return (
@@ -177,6 +190,16 @@ export default function Page() {
 
           <div className="flex items-center space-x-4">
             <ScannerModal />
+            {canManageTeam && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsProjectUsersModalOpen(true)}
+                title="Manage Team"
+              >
+                <Users className="h-5 w-5 text-slate-600" />
+              </Button>
+            )}
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -320,6 +343,16 @@ export default function Page() {
           </Button>
         </div>
       </main>
+
+      {project && user && (
+        <ProjectUserManagementModal
+          isOpen={isProjectUsersModalOpen}
+          onClose={() => setIsProjectUsersModalOpen(false)}
+          projectId={project.id}
+          organizationId={project.organization_id}
+          currentUserId={user.id}
+        />
+      )}
     </div>
   )
 }

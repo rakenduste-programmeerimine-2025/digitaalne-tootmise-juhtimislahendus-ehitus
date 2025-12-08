@@ -22,7 +22,6 @@ async function getUserFromSession(req: NextRequest) {
   return user;
 }
 
-// Helper: Check Company Role
 async function getCompanyRole(userId: string, organizationId: number) {
   const { data } = await supabase
     .from("user_company_roles")
@@ -33,7 +32,6 @@ async function getCompanyRole(userId: string, organizationId: number) {
   return data?.role_id;
 }
 
-// Helper: Check Project Role
 async function getProjectRole(userId: string, projectId: number) {
   const { data } = await supabase
     .from("user_project_roles")
@@ -67,14 +65,15 @@ export async function GET(
     const companyRole = await getCompanyRole(user.id, project.organization_id);
     const projectRole = await getProjectRole(user.id, projectId);
 
-    // Access Check:
-    // 1. Company Owner/Admin (1, 2) -> Access
-    // 2. Project Member (4, 5, 6) -> Access
     if (companyRole !== 1 && companyRole !== 2 && !projectRole) {
       throw new Error("Access denied");
     }
 
-    return NextResponse.json({ project });
+    return NextResponse.json({ 
+      project,
+      user_role: projectRole,
+      org_role: companyRole
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 400 });
