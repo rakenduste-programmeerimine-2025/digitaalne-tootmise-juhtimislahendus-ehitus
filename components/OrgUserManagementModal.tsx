@@ -80,10 +80,13 @@ export function OrgUserManagementModal({
     }
   }, [isOpen, organizationId])
 
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
   const handleAddUser = async () => {
     if (!newUserEmail) return
     setIsAdding(true)
     setError(null)
+    setSuccessMessage(null)
     try {
       const res = await fetch(`/api/organizations/${organizationId}/users`, {
         method: "POST",
@@ -100,8 +103,10 @@ export function OrgUserManagementModal({
         throw new Error(data.error || "Failed to add user")
       }
 
+      setSuccessMessage(data.message || "User added successfully")
       setNewUserEmail("")
       fetchUsers()
+      setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
     } finally {
@@ -218,6 +223,13 @@ export function OrgUserManagementModal({
             </div>
           )}
 
+          {successMessage && (
+            <div className="bg-green-50 text-green-600 p-3 rounded-md flex items-center gap-2 text-sm">
+              <Plus className="h-4 w-4" />
+              {successMessage}
+            </div>
+          )}
+
           <div className="border rounded-md">
             <Table>
               <TableHeader>
@@ -265,7 +277,7 @@ export function OrgUserManagementModal({
                             onValueChange={val =>
                               handleUpdateRole(user.id, parseInt(val))
                             }
-                            disabled={user.role_id === ROLE_IDS.ORG_OWNER} // Cannot change owner from here usually
+                            disabled={user.role_id === ROLE_IDS.ORG_OWNER}
                           >
                             <SelectTrigger className="h-8 w-32">
                               <SelectValue />

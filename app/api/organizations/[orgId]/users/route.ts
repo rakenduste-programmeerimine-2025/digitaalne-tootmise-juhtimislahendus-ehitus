@@ -102,7 +102,32 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ org
       .single();
 
     if (!targetUser) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 });
+        const { data: existingInvite } = await supabase
+            .from("invited_users")
+            .select("id")
+            .eq("email", email)
+            .eq("organization_id", organizationId)
+            .single();
+
+        if (existingInvite) {
+            return NextResponse.json({ error: "User already invited" }, { status: 400 });
+        }
+
+        const expireAt = new Date();
+        expireAt.setDate(expireAt.getDate() + 7);
+
+        const { error: inviteError } = await supabase
+            .from("invited_users")
+            .insert({
+                email: email,
+                organization_id: organizationId,
+                role_id: roleId || ROLE_IDS.ORG_USER,
+                expire_at: expireAt.toISOString(),
+            });
+
+        if (inviteError) throw inviteError;
+
+        return NextResponse.json({ success: true, message: "Invitation sent" });
     }
 
     const existingRole = await getCompanyRole(targetUser.id, organizationId);
