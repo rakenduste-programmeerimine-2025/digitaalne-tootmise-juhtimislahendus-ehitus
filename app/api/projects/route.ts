@@ -141,6 +141,30 @@ export async function POST(req: NextRequest) {
         }
     }
 
+    const partNames = ["Engine", "Transmission", "Brake Pad", "Suspension", "Alternator", "Starter", "Battery", "Radiator", "Compressor", "Pump"];
+    const locations = ["Warehouse A", "Warehouse B", "Shelf C1", "Shelf D5", "Dock 1", "Dock 3", "Sorting Center", "Transit Hub"];
+    const statuses = ["ready", "delayed", "in_transit"];
+
+    const detailsCount = Math.floor(Math.random() * 6) + 5;
+    const detailsInserts = [];
+
+    for (let i = 0; i < detailsCount; i++) {
+        detailsInserts.push({
+            project_id: project.id,
+            name: partNames[Math.floor(Math.random() * partNames.length)],
+            location: locations[Math.floor(Math.random() * locations.length)],
+            status: statuses[Math.floor(Math.random() * statuses.length)],
+        });
+    }
+
+    const { error: detailsError } = await supabase
+        .from("project_details")
+        .insert(detailsInserts);
+
+    if (detailsError) {
+        console.error("Failed to auto-generate project details:", detailsError);
+    }
+
     if (roleError) {
       throw roleError;
     }

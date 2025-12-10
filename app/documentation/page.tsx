@@ -59,9 +59,6 @@ export default function DocumentationPage() {
             Getting Started
           </button>
           <button className="block w-full text-left px-2 py-1.5 rounded text-slate-600 hover:bg-slate-50 text-sm">
-            API Reference
-          </button>
-          <button className="block w-full text-left px-2 py-1.5 rounded text-slate-600 hover:bg-slate-50 text-sm">
             Inventory Management
           </button>
           <button className="block w-full text-left px-2 py-1.5 rounded text-slate-600 hover:bg-slate-50 text-sm">
